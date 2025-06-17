@@ -2,29 +2,22 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
 	"os"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
-	if len(os.Args) != 3 {
+	if len(os.Args) != 2 {
 		fmt.Println("Usage: go run client.go <csv-filepath> <YYYY-MM>")
 		return
 	}
 
-	filepath := os.Args[1]
-	month := os.Args[2]
+	r := mux.NewRouter()
+	r.HandleFunc("/v1/revenue", analyzeMonth).Methods("GET")
 
-	reservations, err := parseCSV(filepath)
-	if err != nil {
-		fmt.Println("Error parsing CSV:", err)
-		return
-	}
-
-	revenue, unreservedCap, err := analyzeMonth(reservations, month)
-	if err != nil {
-		fmt.Println("Error analyzing month:", err)
-		return
-	}
-
-	fmt.Printf("* %s: expected revenue: $%.0f, expected total capacity of the unreserved offices: %d\n", month, revenue, unreservedCap)
+	fmt.Println("Server running on port 8000")
+	log.Fatal(http.ListenAndServe(":8000", r))
 }

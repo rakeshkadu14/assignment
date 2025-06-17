@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -14,6 +17,12 @@ type Reservation struct {
 	MonthlyPrice float64
 	StartDay     time.Time
 	EndDay       *time.Time
+}
+
+type Report struct {
+	Month             string  `json:"month"`
+	ExpectedRevenue   float64 `json:"expectedRevenue"`
+	UnreservedOffices int     `json:"unreservedOffices"`
 }
 
 func parseCSV(filepath string) ([]Reservation, error) {
@@ -45,7 +54,6 @@ func parseCSV(filepath string) ([]Reservation, error) {
 		if strings.TrimSpace(record[3]) != "" {
 			e, _ := time.Parse("2006-01-02", record[3])
 			endDay = &e
-			//fmt.Println("endday=>", endDay)
 		}
 
 		reservations = append(reservations, Reservation{
@@ -59,26 +67,28 @@ func parseCSV(filepath string) ([]Reservation, error) {
 	return reservations, nil
 }
 
-func analyzeMonth(reservations []Reservation, month string) (float64, int, error) {
+func analyzeMonth(w http.ResponseWriter, r *http.Request) {
+
+	filepath := os.Args[1]
+	reservations, err := parseCSV(filepath)
+	if err != nil {
+		fmt.Println("Error parsing CSV:", err)
+		os.Exit(0)
+	}
+
+	month := r.URL.Query().Get("month")
 	//fmt.Println(month)
 	monthStart, err := time.Parse("2006-01", month)
 
 	if err != nil {
-		return 0, 0, err
+		os.Exit(0)
 	}
 	monthEnd := monthStart.AddDate(0, 1, -1)
-	//fmt.Println("monthEnd", monthEnd)
 	daysInMonth := monthEnd.Day()
-	//fmt.Println("daysInMonth", daysInMonth)
-	//fmt.Println("-----------------")
 	totalRevenue := 0.0
 	unreservedCapacity := 0
 
 	for _, res := range reservations {
-		// Check overlap
-		//fmt.Println("*****************")
-		//fmt.Println("res=>", res)
-		//fmt.Println("*****************")
 		resEnd := res.EndDay
 		if resEnd == nil {
 			tmp := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
@@ -93,17 +103,18 @@ func analyzeMonth(reservations []Reservation, month string) (float64, int, error
 		start := maxDate(res.StartDay, monthStart)
 		end := minDate(*resEnd, monthEnd)
 		daysReserved := int(end.Sub(start).Hours()/24) + 1
-		//fmt.Println("start", start)
-		//fmt.Println("end", end)
-		//fmt.Println("daysReserved", daysReserved)
-		//fmt.Println("res.MonthlyPrice", res.MonthlyPrice)
 		proratedRevenue := res.MonthlyPrice * float64(daysReserved) / float64(daysInMonth)
-		//fmt.Println("proratedRevenue", proratedRevenue)
 		totalRevenue += proratedRevenue
-		//fmt.Println("totalRevenue", totalRevenue)
 	}
 
-	return totalRevenue, unreservedCapacity, nil
+	report := Report{
+		Month:             month,
+		ExpectedRevenue:   totalRevenue,       // Dummy data
+		UnreservedOffices: unreservedCapacity, // Dummy data
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(report)
 }
 
 func minDate(a, b time.Time) time.Time {
