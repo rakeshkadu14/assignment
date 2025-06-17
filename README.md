@@ -1,5 +1,5 @@
 The REST API has been desgined in a simple way to solve the assignment.
-Execute the go proram using below command and pass the csv file path (mandatory)
+Execute the go program using below command and pass the csv file path (mandatory)
 
 command : go run .\backend.go .\client.go .\reservations.csv
 
